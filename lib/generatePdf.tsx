@@ -2,8 +2,11 @@
  * Renders the Clarafy-translated markdown to a downloadable PDF.
  *
  * Uses @react-pdf/renderer — pure React, server-side, no headless browser.
- * Fonts are fetched from Google Fonts at render time; they're cached for the
- * life of the Node process.
+ *
+ * Fonts: we use react-pdf's built-in Helvetica (body) and Times-Roman (headings).
+ * We deliberately do NOT pull Libre Baskerville / Nunito from Google Fonts here —
+ * on Vercel serverless cold starts those fetches were timing out / failing. Times
+ * gives us a similar "serif-for-headlines" feel and ships with the library itself.
  *
  * Every page shows the Clarafy wordmark in the header and the disclaimer in
  * the footer. The disclaimer appearing on every page is intentional — it's
@@ -22,60 +25,35 @@ import {
 } from '@react-pdf/renderer';
 import { parseMarkdown, type Block, type InlineSpan } from './markdown';
 
-// Register the two brand fonts. @react-pdf only supports TTF/OTF from a URL.
-Font.register({
-  family: 'Libre Baskerville',
-  fonts: [
-    {
-      src: 'https://fonts.gstatic.com/s/librebaskerville/v14/kmKnZrc3Hgbbcjq75U4uslyuy4kn0pNeYRI4CN2V.ttf',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/librebaskerville/v14/kmKiZrc3Hgbbcjq75U4uslyuy4kn0qNcaxYaDc2V2ro.ttf',
-      fontWeight: 700,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/librebaskerville/v14/kmKhZrc3Hgbbcjq75U4uslyuy4kn0qviTjY1_ExT.ttf',
-      fontWeight: 400,
-      fontStyle: 'italic',
-    },
-  ],
-});
-Font.register({
-  family: 'Nunito',
-  fonts: [
-    {
-      src: 'https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshRTM9jo7eTWk.ttf',
-      fontWeight: 300,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDIkhRTM9jo7eTWk.ttf',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLAhRTM9jo7eTWk.ttf',
-      fontWeight: 600,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDKUkRTM9jo7eTWk.ttf',
-      fontWeight: 700,
-    },
-  ],
-});
-
 // Hyphenation off — legal defined terms must not break across lines.
 Font.registerHyphenationCallback((word) => [word]);
 
+// react-pdf ships these four families out of the box. No network fetch needed.
+const SERIF = 'Times-Roman';
+const SERIF_BOLD = 'Times-Bold';
+const SERIF_ITALIC = 'Times-Italic';
+const SANS = 'Helvetica';
+const SANS_BOLD = 'Helvetica-Bold';
+const SANS_ITALIC = 'Helvetica-Oblique';
+
+const CORAL = '#FF5C3A';
+const INK = '#1C1C1C';
+const WARM = '#FDF8F4';
+const SOFT = '#FFF0EB';
+const RULE = '#EDE6DC';
+const MUTED = '#888888';
+const HUSH = '#BBBBBB';
+
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: '#FDF8F4',
+    backgroundColor: WARM,
     paddingTop: 72,
     paddingBottom: 72,
     paddingHorizontal: 56,
-    fontFamily: 'Nunito',
+    fontFamily: SANS,
     fontSize: 10.5,
-    color: '#1C1C1C',
-    lineHeight: 1.6,
+    color: INK,
+    lineHeight: 1.55,
   },
   header: {
     position: 'absolute',
@@ -86,21 +64,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     fontSize: 9,
-    color: '#AAA',
+    color: MUTED,
   },
-  logo: { fontFamily: 'Libre Baskerville', fontSize: 14, color: '#1C1C1C' },
-  logoA: { fontFamily: 'Libre Baskerville', fontSize: 14, fontStyle: 'italic', color: '#FF5C3A' },
+  logo: { fontFamily: SERIF_BOLD, fontSize: 14, color: INK },
+  logoA: { fontFamily: SERIF_ITALIC, fontSize: 14, color: CORAL },
   footer: {
     position: 'absolute',
     bottom: 28,
     left: 56,
     right: 56,
     borderTopWidth: 1,
-    borderTopColor: '#EDE6DC',
+    borderTopColor: RULE,
     paddingTop: 8,
     fontSize: 7.5,
-    color: '#BBB',
-    fontWeight: 300,
+    color: HUSH,
     lineHeight: 1.5,
   },
   pageNumber: {
@@ -108,46 +85,42 @@ const styles = StyleSheet.create({
     bottom: 14,
     right: 56,
     fontSize: 8,
-    color: '#CCC',
+    color: HUSH,
   },
   h1: {
-    fontFamily: 'Libre Baskerville',
-    fontWeight: 700,
+    fontFamily: SERIF_BOLD,
     fontSize: 22,
-    color: '#1C1C1C',
+    color: INK,
     marginTop: 6,
     marginBottom: 14,
-    letterSpacing: -0.5,
   },
   h2: {
-    fontFamily: 'Libre Baskerville',
-    fontWeight: 700,
+    fontFamily: SERIF_BOLD,
     fontSize: 13,
-    color: '#1C1C1C',
+    color: INK,
     marginTop: 18,
     marginBottom: 6,
   },
   h3: {
-    fontFamily: 'Libre Baskerville',
-    fontWeight: 700,
+    fontFamily: SERIF_BOLD,
     fontSize: 11,
-    color: '#1C1C1C',
+    color: INK,
     marginTop: 10,
     marginBottom: 4,
   },
   p: { marginBottom: 6 },
   quote: {
-    backgroundColor: '#FFF0EB',
+    backgroundColor: SOFT,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF5C3A',
+    borderLeftColor: CORAL,
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginVertical: 6,
     borderRadius: 4,
     fontSize: 10,
   },
-  bold: { fontWeight: 700 },
-  italic: { fontStyle: 'italic', color: '#888' },
+  bold: { fontFamily: SANS_BOLD },
+  italic: { fontFamily: SANS_ITALIC, color: MUTED },
 });
 
 function renderSpan(span: InlineSpan, idx: number) {

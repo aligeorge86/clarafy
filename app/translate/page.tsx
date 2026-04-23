@@ -15,6 +15,7 @@ export default function TranslatePage() {
   const [markdown, setMarkdown] = useState<string>('');
   const [filename, setFilename] = useState<string>('');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   async function handleFile(file: File) {
     setStage('uploading');
@@ -46,6 +47,7 @@ export default function TranslatePage() {
   async function handleDownloadPdf() {
     if (!markdown) return;
     setDownloadingPdf(true);
+    setPdfError(null);
     try {
       const resp = await fetch('/api/pdf', {
         method: 'POST',
@@ -53,10 +55,20 @@ export default function TranslatePage() {
         body: JSON.stringify({ markdown, filename }),
       });
       if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data?.error || 'PDF generation failed');
+        const body = await resp.text();
+        let msg = `PDF generation failed (HTTP ${resp.status})`;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error) msg = parsed.error;
+        } catch {
+          if (body) msg = `${msg}: ${body.slice(0, 200)}`;
+        }
+        throw new Error(msg);
       }
       const blob = await resp.blob();
+      if (blob.size < 200) {
+        throw new Error('PDF came back empty. Please try again.');
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -64,9 +76,10 @@ export default function TranslatePage() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Revoke after a tick so some browsers don't cancel the download.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'PDF download failed');
+      setPdfError(e instanceof Error ? e.message : 'PDF download failed');
     } finally {
       setDownloadingPdf(false);
     }
@@ -154,6 +167,13 @@ export default function TranslatePage() {
                 </button>
               </div>
             </div>
+
+            {pdfError && (
+              <div className="mx-auto mb-6 max-w-[720px] rounded-[14px] border border-coral-border bg-coral-soft px-5 py-4 text-[0.88rem] text-ink">
+                <strong>Couldn&apos;t build the PDF: </strong>
+                {pdfError}
+              </div>
+            )}
 
             <article
               className="doc-prose mx-auto max-w-[720px] rounded-2xl border border-rule bg-white px-10 py-10"
