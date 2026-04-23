@@ -2,26 +2,18 @@
  * Document ingestion. Zero-retention: the incoming buffer lives only in memory.
  *
  * Supported formats:
- *   - application/pdf  → extracted via pdfjs-dist (pure JS, no system canvas)
+ *   - application/pdf   → extracted via unpdf (serverless-friendly wrapper over pdfjs-dist)
  *   - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
- *                       → extracted via mammoth
+ *                        → extracted via mammoth
  *
  * Returns a plain text string, preserving paragraph boundaries with \n\n.
+ *
+ * Why unpdf? pdfjs-dist directly spawns a worker thread and needs GlobalWorkerOptions.workerSrc
+ * to point at its companion worker file. On Vercel serverless, tracing that file in correctly
+ * is flaky. unpdf bundles a serverless-safe build of pdfjs-dist and handles workers for us.
  */
 
 import mammoth from 'mammoth';
-
-// Minimal structural type for the pdfjs-dist legacy API we use. The legacy
-// ESM bundle doesn't export types, so we model the shape locally.
-type PdfTextItem = { str?: string; hasEOL?: boolean };
-type PdfPage = {
-  getTextContent: () => Promise<{ items: PdfTextItem[] }>;
-};
-type PdfDocumentLike = {
-  numPages: number;
-  getPage: (n: number) => Promise<PdfPage>;
-  destroy: () => Promise<void>;
-};
 
 export type SupportedMime =
   | 'application/pdf'
@@ -60,37 +52,12 @@ async function extractDocxText(buffer: ArrayBuffer): Promise<string> {
 }
 
 async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
-  // pdfjs-dist is ESM; we load the legacy build which works in Node without canvas.
-  // The legacy bundle ships without TS types, hence the dynamic-import typing.
-  const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as {
-    GlobalWorkerOptions: { workerSrc: string };
-    getDocument: (opts: Record<string, unknown>) => { promise: Promise<PdfDocumentLike> };
-  };
-
-  // Disable the worker in Node — we run everything on the main thread.
-  pdfjs.GlobalWorkerOptions.workerSrc = '';
-
-  const doc = await pdfjs.getDocument({
-    data: new Uint8Array(buffer),
-    disableWorker: true,
-    isEvalSupported: false,
-    useSystemFonts: false,
-  }).promise;
-
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((it: PdfTextItem) => it.str ?? '')
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    pages.push(pageText);
-  }
-
-  await doc.destroy();
-  return normalise(pages.join('\n\n'));
+  // unpdf is designed for Node + serverless. It returns an array of per-page
+  // strings when mergePages is false; we want one big string with page breaks.
+  const { extractText: unpdfExtractText, getDocumentProxy } = await import('unpdf');
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await unpdfExtractText(pdf, { mergePages: true });
+  return normalise(text);
 }
 
 function normalise(text: string): string {
