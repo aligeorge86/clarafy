@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Clarafy brand defaults ─────────────────────────────── */
+:root {
+  color-scheme: only light;
+}
+
+html,
+body {
+  background: #FDF8F4;
+  color: #1C1C1C;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force light theme — Clarafy is intentionally warm white only for v1.
+   Following the mockup's `@media (prefers-color-scheme: dark)` override. */
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background: #FDF8F4 !important;
+    color: #1C1C1C !important;
+  }
+}
+
+.font-display {
+  font-family: 'Libre Baskerville', Georgia, serif;
+}
+
+/* Coral italic "a" trick used in the logo and hero headings. */
+.brand-italic {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-style: italic;
+  color: #FF5C3A;
+}
+
+/* Dashed upload-box hover glow */
+.upload-dropzone {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.upload-dropzone:hover,
+.upload-dropzone.is-drag {
+  border-color: #FF5C3A;
+  box-shadow: 0 8px 40px rgba(255, 92, 58, 0.08);
+}
+
+/* Translated-document reading styles (used on /translate result view) */
+.doc-prose {
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #1C1C1C;
+}
+.doc-prose h1,
+.doc-prose h2,
+.doc-prose h3 {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  letter-spacing: -0.5px;
+  color: #1C1C1C;
+}
+.doc-prose h1 { font-size: 1.9rem; margin: 2rem 0 0.75rem; }
+.doc-prose h2 { font-size: 1.35rem; margin: 1.75rem 0 0.5rem; }
+.doc-prose h3 { font-size: 1.1rem; margin: 1.25rem 0 0.4rem; }
+.doc-prose p  { margin: 0.6rem 0; }
+.doc-prose ul { margin: 0.5rem 0 0.9rem 1.25rem; list-style: disc; }
+.doc-prose ul li { margin: 0.25rem 0; padding-left: 0.25rem; }
+.doc-prose ul li::marker { color: #FF5C3A; }
+.doc-prose strong { font-weight: 700; color: #1C1C1C; }
+.doc-prose em { color: #FF5C3A; font-style: italic; }
+.doc-prose .plain-english {
+  background: #FFF0EB;
+  border-left: 3px solid #FF5C3A;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin: 0.6rem 0 0.9rem;
+  font-size: 0.92rem;
+  color: #1C1C1C;
+}
+.doc-prose .gloss {
+  color: #888;
+  font-style: italic;
+  font-size: 0.95em;
+}
+
+/* Spinner ring for translation-in-progress */
+@keyframes clarafy-spin {
+  to { transform: rotate(360deg); }
+}
+.clarafy-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #FFD5C8;
+  border-top-color: #FF5C3A;
+  animation: clarafy-spin 0.8s linear infinite;
+}
