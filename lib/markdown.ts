@@ -19,8 +19,26 @@ export type Block =
   | { kind: 'quote'; spans: InlineSpan[] }
   | { kind: 'p'; spans: InlineSpan[] };
 
+/**
+ * Decode the HTML entities that sometimes slip through from Claude
+ * (especially `&nbsp;` used for indentation). The input is Markdown,
+ * not HTML, so treating these as literal characters is never right.
+ */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–');
+}
+
 export function parseMarkdown(md: string): Block[] {
-  const lines = md.replace(/\r\n/g, '\n').split('\n');
+  const normalised = decodeEntities(md.replace(/\r\n/g, '\n'));
+  const lines = normalised.split('\n');
   const blocks: Block[] = [];
   let paragraph: string[] = [];
 
